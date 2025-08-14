@@ -1,0 +1,50 @@
+{
+  "env": {
+    "browser": true,
+    "commonjs": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": ["eslint:recommended"],
+  "parserOptions": {
+    "ecmaVersion": "latest"
+  },
+  "rules": {
+    "rest-spread-spacing": ["error", "never"],
+    "no-multi-spaces": ["error", { "ignoreEOLComments": true }],
+    "no-unused-vars": [
+      "error",
+      {
+        "args": "all",
+        "argsIgnorePattern": "^_",
+        "caughtErrors": "all",
+        "caughtErrorsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "func-call-spacing": ["error", "never"],
+    "no-self-compare": "error",
+    "no-undef": "error",
+    "semi": ["error", "always"],
+    "no-extra-semi": "error",
+    "no-use-before-define": "error",
+    "no-prototype-builtins": "error",
+    "no-console": ["error", { "allow": ["error"] }]
+  },
+  "overrides": [
+    {
+      "files": [
+        "utils/database/**/*.js",
+        "schedular/appschedule.js",
+        "server.js",
+        "services/Sync/**/*.js",
+        "services/DB/**/*.js"
+      ],
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ]
+}
