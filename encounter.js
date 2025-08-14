@@ -162,7 +162,11 @@ async function migrateEncounter() {
       }
     }
 
-    await Attach.create(bulkArr);
+    try {
+      await Attach.insertMany(bulkArr, { ordered: false });
+    } catch (err) {
+      console.error(err);
+    }
 
     const doc = await MergeProgress.updateOne(
       { collectionName: "encs" },
