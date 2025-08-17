@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 // const mergeAllCollections = require("./merge");
 // const processSalesCollection = require("./sales");
 const migrateEncounter = require("./encounter");
+require("dotenv").config();
 
 const app = express();
 const PORT = 3000;

@@ -1,6 +1,8 @@
 const xml2js = require("xml2js");
 const axios = require("axios");
 const FormData = require("form-data");
+const AWS = require("aws-sdk");
+require("dotenv").config();
 
 // MODELS
 const Encounter = require("./models/Encounter.js");
@@ -8,36 +10,66 @@ const Attach = require("./models/Attach.js");
 const MergeProgress = require("./models/Progress");
 const FailedParsing = require("./models/FailedParsing");
 
+// Configure AWS SDK (set your credentials and region)
+// const s3 = new AWS.S3({
+//   accessKeyId: process.env.ACCESS_KEY, // set in your .env
+//   secretAccessKey: process.env.SECRET_ACCESS_KEY, // set in your .env
+//   region: process.env.REGION,
+// });
+
 async function uploadAttachments(data) {
-  const form = new FormData();
-  form.append("tablename", data.tablename);
-  form.append("recordno", data.recordno);
-  form.append(
-    "path",
-    `emr~${data.clinic}~${data.client}~${data.patient}~${data.encounter}~`
-  );
-  form.append("tenantid", "brookvillerah");
+  const bucket = "brookvillerah-woovetbucket";
+  // Check if file exists in S3
+  try {
+    const doc = await Attach.findOne({ recordno: data.recordno }).lean();
 
-  const res = await axios.post(
-    "https://brookvillerah.vetport.com/woovet_attachment.html",
-    form,
-    {
-      headers: {
-        ...form.getHeaders(),
-        Cookie: "re-mind54842=28-3899336014-97375451",
-      },
-    }
-  );
+    console.log("test");
+    await s3
+      .headObject({
+        Bucket: bucket,
+        Key: doc.file.file_content.split("amazonaws.com/")[1],
+      })
+      .promise();
+    console.log("exists");
+    // File exists, return its info
+    return {
+      exists: true,
+    };
+  } catch (err) {
+    if (err.code !== "NotFound") throw err;
+    // File does not exist, proceed to upload
+    console.log(err);
+    const form = new FormData();
+    form.append("tablename", data.tablename);
+    form.append("recordno", data.recordno);
+    form.append(
+      "path",
+      `emr~${data.clinic}~${data.client}~${data.patient}~${data.encounter}~`
+    );
+    form.append("tenantid", "brookvillerah");
 
-  console.log(res.data);
+    const res = await axios.post(
+      "https://brookvillerah.vetport.com/woovet_attachment.html",
+      form,
+      {
+        headers: {
+          ...form.getHeaders(),
+          Cookie: "re-mind54842=28-3899336014-97375451",
+        },
+      }
+    );
 
-  let file = {
-    file_content: `https://brookvillerah-woovetbucket.s3.ap-south-1.amazonaws.com/emr/${data.clinic}/${data.client}/${data.patient}/${data.encounter}/${res.data}`,
-    file_name: res.data.split(".")[0],
-    file_ext: res.data.split(".")[1],
-  };
+    console.log(res.data);
 
-  return file;
+    let file = {
+      file_content: `https://${bucket}.s3.ap-south-1.amazonaws.com/emr/${data.clinic}/${data.client}/${data.patient}/${data.encounter}/${res.data}`,
+      file_name: res.data.split(".")[0],
+      file_ext: res.data.split(".")[1],
+      exists: false,
+    };
+
+    return file;
+  }
 }
 
 async function migrateEncounter() {
@@ -139,12 +171,20 @@ async function migrateEncounter() {
                             tablename: "diagnosisimage",
                           });
 
-                          bulkArr.push({
-                            file: file,
-                            tablename: "diagnosisimage",
-                            recordno: i,
-                            encounterId: item._id,
-                          });
+                          if (!file.exists) {
+                            bulkArr.push({
+                              updateOne: {
+                                filter: { recordno: i },
+                                update: {
+                                  file: file,
+                                  tablename: "diagnosisimage",
+                                  recordno: i,
+                                  encounterId: item._id,
+                                },
+                                upsert: true,
+                              },
+                            });
+                          }
                         }
                       }
                       break;
@@ -163,7 +203,7 @@ async function migrateEncounter() {
     }
 
     try {
-      await Attach.insertMany(bulkArr, { ordered: false });
+      await Attach.bulkWrite(bulkArr);
     } catch (err) {
       console.error(err);
     }
